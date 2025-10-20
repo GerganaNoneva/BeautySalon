@@ -66,12 +66,25 @@ export default function ScheduleViewModal({
   const loadSchedule = async () => {
     setLoading(true);
     try {
+      console.log('ScheduleViewModal: Loading schedule for date:', selectedDate);
+      console.log('ScheduleViewModal: Service duration:', serviceDuration);
+
+      if (!serviceDuration || serviceDuration === 0) {
+        console.error('ScheduleViewModal: Invalid service duration!', serviceDuration);
+        setTimeSlots([]);
+        setLoading(false);
+        return;
+      }
+
       const dateStr = selectedDate.toISOString().split('T')[0];
       const dayOfWeek = selectedDate.getDay();
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const dayHours = workingHours[dayNames[dayOfWeek]];
 
+      console.log('ScheduleViewModal: Day hours:', dayHours);
+
       if (!dayHours || dayHours.closed) {
+        console.log('ScheduleViewModal: Salon is closed on this day');
         setTimeSlots([]);
         return;
       }
@@ -88,6 +101,9 @@ export default function ScheduleViewModal({
 
       const startTotalMinutes = startHour * 60 + startMinute;
       const endTotalMinutes = endHour * 60 + endMinute;
+
+      console.log('ScheduleViewModal: Start minutes:', startTotalMinutes, 'End minutes:', endTotalMinutes);
+      console.log('ScheduleViewModal: Service duration:', serviceDuration);
 
       for (let totalMinutes = startTotalMinutes; totalMinutes + serviceDuration <= endTotalMinutes; totalMinutes += 30) {
         const hour = Math.floor(totalMinutes / 60);
@@ -108,6 +124,9 @@ export default function ScheduleViewModal({
 
         slots.push({ time: timeStr, isAvailable });
       }
+
+      console.log('ScheduleViewModal: Generated slots:', slots.length);
+      console.log('ScheduleViewModal: Available slots:', slots.filter(s => s.isAvailable).length);
 
       setTimeSlots(slots);
     } catch (error) {
@@ -188,7 +207,7 @@ export default function ScheduleViewModal({
               <Text style={styles.emptyText}>Салонът е затворен в този ден</Text>
             </View>
           ) : (
-            <ScrollView style={styles.slotsContainer}>
+            <ScrollView style={styles.slotsContainer} contentContainerStyle={{ paddingBottom: 20 }}>
               <View style={styles.legend}>
                 <View style={styles.legendItem}>
                   <View style={[styles.legendColor, { backgroundColor: theme.colors.success }]} />
@@ -201,6 +220,10 @@ export default function ScheduleViewModal({
               </View>
 
               <View style={styles.slotsGrid}>
+                {(() => {
+                  console.log('ScheduleViewModal: Rendering', timeSlots.length, 'slots');
+                  return null;
+                })()}
                 {timeSlots.map((slot, index) => (
                   <TouchableOpacity
                     key={index}
@@ -252,8 +275,9 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.xl,
     width: '90%',
-    maxHeight: '80%',
-    overflow: 'hidden',
+    height: '80%',
+    display: 'flex',
+    flexDirection: 'column',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -306,6 +330,7 @@ const styles = StyleSheet.create({
   },
   slotsContainer: {
     flex: 1,
+    minHeight: 200,
   },
   legend: {
     flexDirection: 'row',
@@ -332,7 +357,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: theme.spacing.md,
-    gap: theme.spacing.sm,
+    justifyContent: 'flex-start',
   },
   slotCard: {
     width: '30%',
@@ -340,6 +365,8 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.md,
     borderWidth: 2,
     alignItems: 'center',
+    marginBottom: theme.spacing.sm,
+    marginRight: '3%',
   },
   slotTime: {
     fontSize: 16,

@@ -123,13 +123,7 @@ BEGIN
 END;
 $$;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_enum WHERE enumlabel = 'appointment_reminder' AND enumtypid = (
-      SELECT oid FROM pg_type WHERE typname = 'notification_type'
-    )
-  ) THEN
-    ALTER TYPE notification_type ADD VALUE 'appointment_reminder';
-  END IF;
-END $$;
+-- Note: notification_type enum does not exist in this database
+-- The type column in notifications table is TEXT, not ENUM
+-- So we don't need to add enum values
+-- Just use 'appointment_reminder' as a string when inserting notifications

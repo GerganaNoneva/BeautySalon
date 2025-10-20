@@ -28,6 +28,7 @@ type ScheduleDatePickerProps = {
     closed: boolean;
   };
   excludeAppointmentId?: string;
+  allowAnyDate?: boolean; // Позволява избор на всяка дата (за админи)
 };
 
 type DateAvailability = {
@@ -41,6 +42,7 @@ export default function ScheduleDatePicker({
   onSelectDate,
   workingHours,
   excludeAppointmentId,
+  allowAnyDate = false,
 }: ScheduleDatePickerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
@@ -287,7 +289,7 @@ export default function ScheduleDatePicker({
                 } else if (isSunday) {
                   dayStyleArray.push(styles.unavailableDay);
                   textStyleArray = [styles.unavailableDayText];
-                  isDisabled = true;
+                  isDisabled = !allowAnyDate; // Ако allowAnyDate е true, не disabled-ваме
                 } else {
                   const hasFreeSlots = availability[dateStr];
                   console.log(`🔍 Date: ${dateStr}, Day: ${dayOfWeek}, hasFreeSlots:`, hasFreeSlots);
@@ -297,7 +299,7 @@ export default function ScheduleDatePicker({
                   } else {
                     dayStyleArray.push(styles.unavailableDay);
                     textStyleArray = [styles.unavailableDayText];
-                    isDisabled = true;
+                    isDisabled = !allowAnyDate; // Ако allowAnyDate е true, не disabled-ваме
                   }
                 }
 

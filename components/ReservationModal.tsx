@@ -677,7 +677,13 @@ export default function ReservationModal({
       console.log('=== CREATING APPOINTMENT ===');
       setLoading(true);
       const finalDate = isEditMode ? editDate : selectedDate;
-      const dateStr = finalDate.toISOString().split('T')[0];
+      // Use local date format to avoid timezone issues
+      const localDate = new Date(
+        finalDate.getFullYear(),
+        finalDate.getMonth(),
+        finalDate.getDate()
+      );
+      const dateStr = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`;
 
       console.log('Date:', dateStr);
       console.log('Start time:', startTime);
@@ -687,12 +693,16 @@ export default function ReservationModal({
       const endMinutes = timeToMinutes(endTime);
 
       console.log('Checking for existing appointments...');
+      console.log('Edit mode:', isEditMode);
+      console.log('Editing appointment ID:', editingAppointment?.id);
+
       let query = supabase
         .from('appointments')
         .select('id, start_time, end_time, profiles!appointments_client_id_fkey(full_name), services(name)')
         .eq('appointment_date', dateStr);
 
       if (isEditMode && editingAppointment) {
+        console.log('Excluding current appointment from overlap check:', editingAppointment.id);
         query = query.neq('id', editingAppointment.id);
       }
 
@@ -829,30 +839,7 @@ export default function ReservationModal({
 
         console.log('✅ SUCCESS: Appointment created with ID:', insertedAppointment.id);
 
-        if (!isUnregistered && clientId) {
-          console.log('Sending notification to registered client:', clientId);
-          const { error: notifError } = await supabase
-            .from('notifications')
-            .insert({
-              user_id: clientId,
-              type: 'appointment_created',
-              title: 'Нова резервация',
-              body: `Вашата резервация за ${selectedService.name} на ${finalDate.toLocaleDateString('bg-BG')} от ${startTime} до ${endTime} е потвърдена.`,
-              data: {
-                appointment_id: insertedAppointment.id,
-                date: dateStr,
-                start_time: startTime,
-                end_time: endTime,
-                service_name: selectedService.name,
-              }
-            });
-
-          if (notifError) {
-            console.error('Error sending notification:', notifError);
-          } else {
-            console.log('✅ Notification sent successfully');
-          }
-        }
+        // Database trigger automatically creates notification, no manual insert needed
 
         Alert.alert('Успех', 'Резервацията е създадена успешно');
       }

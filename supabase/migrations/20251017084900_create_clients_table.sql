@@ -49,18 +49,29 @@ BEGIN
   END IF;
 END $$;
 
--- Add constraint to ensure appointment has either user_id or client_id, not both
+-- Add constraint to ensure appointment has either client_id or unregistered_client_id, not both
+-- This constraint is skipped if the columns don't exist (migration may be outdated)
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_name = 'appointments_user_or_client_check'
+  -- Check if both columns exist before adding constraint
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'appointments' AND column_name = 'client_id'
+  ) AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'appointments' AND column_name = 'unregistered_client_id'
   ) THEN
-    ALTER TABLE appointments ADD CONSTRAINT appointments_user_or_client_check
-    CHECK (
-      (user_id IS NOT NULL AND client_id IS NULL) OR
-      (user_id IS NULL AND client_id IS NOT NULL)
-    );
+    -- Only add constraint if it doesn't exist
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.table_constraints
+      WHERE constraint_name = 'appointments_client_or_unregistered_check'
+    ) THEN
+      ALTER TABLE appointments ADD CONSTRAINT appointments_client_or_unregistered_check
+      CHECK (
+        (client_id IS NOT NULL AND unregistered_client_id IS NULL) OR
+        (client_id IS NULL AND unregistered_client_id IS NOT NULL)
+      );
+    END IF;
   END IF;
 END $$;
 
@@ -136,7 +147,18 @@ CREATE POLICY "Admins can view all appointments"
   );
 
 DROP POLICY IF EXISTS "Users can view own appointments" ON appointments;
-CREATE POLICY "Users can view own appointments"
-  ON appointments FOR SELECT
-  TO authenticated
-  USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Clients view own appointments" ON appointments;
+
+-- Only create this policy if client_id column exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'appointments' AND column_name = 'client_id'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Clients view own appointments"
+      ON appointments FOR SELECT
+      TO authenticated
+      USING (auth.uid() = client_id)';
+  END IF;
+END $$;

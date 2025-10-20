@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx supabase db execute:*)",
+      "Bash(node scripts/listAppointments.js:*)",
+      "Bash(npm start)",
+      "Bash(npx supabase db push)",
+      "Bash(node scripts/checkPolicies.js:*)",
+      "Bash(npm run web:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Read(//c/Users/darkv/OneDrive/Desktop/**)",
+      "Bash(npm install)",
+      "Bash(npx expo start --web --clear)",
+      "Bash(node scripts/checkPoliciesAfterMigration.js:*)",
+      "Bash(node scripts/testAdminAccess.js:*)",
+      "Bash(npx supabase db push:*)",
+      "Bash(node scripts/checkDuplicateNotifications.js:*)",
+      "Bash(node scripts/cleanupDuplicateNotifications.js:*)",
+      "Bash(node scripts/testMessageTriggers.js:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

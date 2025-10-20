@@ -1,3 +1,5 @@
+import NewReservationModal from '../../components/NewReservationModal';
+import NewReservationModal2 from '../../components/NewReservationModal2';
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -307,8 +309,16 @@ export default function AdminScheduleScreen() {
 
   const handleReservationChoice = () => {
     setShowSlotActionModal(false);
-    setShowReservationModal(true);
+    setShowNewReservationModal(true);
   };
+
+  const [showNewReservationModal, setShowNewReservationModal] = React.useState<boolean>(false);
+  const [showNewReservationModal2, setShowNewReservationModal2] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    setShowNewReservationModal(false);
+    setShowNewReservationModal2(false);
+  }, []);
 
   const handleVoiceTranscription = (data: { text: string; parsed: any }) => {
   };
@@ -507,7 +517,7 @@ export default function AdminScheduleScreen() {
       <View style={styles.voiceContainer}>
         <TouchableOpacity
           style={styles.voiceActionButton}
-          onPress={() => {}}
+          onPress={() => setShowNewReservationModal2(true)}
         >
           <Plus size={24} color={theme.colors.primary} />
         </TouchableOpacity>
@@ -689,12 +699,38 @@ export default function AdminScheduleScreen() {
         onClose={() => setShowNotifications(false)}
       />
 
-
       <FreeSlotNotificationModal
         visible={showFreeSlotModal}
         onClose={() => setShowFreeSlotModal(false)}
         selectedDate={selectedDate}
         startTime={selectedSlot?.time || '09:00'}
+      />
+
+      {/* New Reservation Modal from slot click */}
+      <NewReservationModal
+        visible={showNewReservationModal}
+        onClose={() => setShowNewReservationModal(false)}
+        onConfirm={() => {
+          setShowNewReservationModal(false);
+          loadAppointments();
+        }}
+        selectedDate={selectedDate}
+        selectedTime={selectedSlot?.time || '09:00'}
+        workingHours={workingHours}
+        appointments={appointments}
+      />
+
+      {/* New Separate Reservation Modal from + button */}
+      <NewReservationModal2
+        visible={showNewReservationModal2}
+        onClose={() => setShowNewReservationModal2(false)}
+        onConfirm={(date) => {
+          setShowNewReservationModal2(false);
+          if (date) {
+            setSelectedDate(date);
+          }
+          loadAppointments();
+        }}
       />
 
       <ReservationModal
