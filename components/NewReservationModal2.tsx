@@ -21,6 +21,8 @@ interface NewReservationModal2Props {
   visible: boolean;
   onClose: () => void;
   onConfirm: (date?: Date) => void;
+  preselectedDate?: Date | null;
+  preselectedTime?: string | null;
 }
 
 type Service = {
@@ -48,6 +50,8 @@ export default function NewReservationModal2({
   visible,
   onClose,
   onConfirm,
+  preselectedDate,
+  preselectedTime,
 }: NewReservationModal2Props) {
   const [services, setServices] = useState<Service[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -61,6 +65,16 @@ export default function NewReservationModal2({
   const [searchQuery, setSearchQuery] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [voiceData, setVoiceData] = useState<any>(null);
+
+  // Automatically populate fields from voice data
+  useEffect(() => {
+    if (voiceData) {
+      if (voiceData.date) setSelectedDate(new Date(voiceData.date));
+      if (voiceData.startTime) setStartTime(voiceData.startTime);
+      if (voiceData.endTime) setEndTime(voiceData.endTime);
+    }
+  }, [voiceData]);
   const [showServicePicker, setShowServicePicker] = useState(false);
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
@@ -78,10 +92,18 @@ export default function NewReservationModal2({
     if (visible) {
       resetForm();
       loadData();
-      // Automatically open date picker when modal opens
-      setShowDatePicker(true);
+      // Check if we have preselected data
+      if (preselectedDate && preselectedTime) {
+        setSelectedDate(preselectedDate);
+        setStartTime(preselectedTime);
+        loadWorkingHoursForDate(preselectedDate);
+        loadEndTimeOptionsForStartTime(preselectedDate, preselectedTime);
+      } else {
+        // Automatically open date picker when modal opens
+        setShowDatePicker(true);
+      }
     }
-  }, [visible]);
+  }, [visible, preselectedDate, preselectedTime]);
 
   const loadData = async () => {
     setLoading(true);
@@ -133,8 +155,10 @@ export default function NewReservationModal2({
   };
 
   const handleDateSelect = async (date: Date) => {
-    setSelectedDate(date);
-    await loadWorkingHoursForDate(date);
+    // Нормализираме датата за local timezone като използваме UTC компонентите
+    const normalizedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+    setSelectedDate(normalizedDate);
+    await loadWorkingHoursForDate(normalizedDate);
     setShowSlotsPicker(true);
   };
 
@@ -162,6 +186,90 @@ export default function NewReservationModal2({
       }
     } catch (error) {
       console.error('Error loading working hours for date:', error);
+    }
+  };
+
+  const loadEndTimeOptionsForStartTime = async (date: Date, startTimeStr: string) => {
+    try {
+      // Get appointments for the selected date
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+      const { data: appointments, error } = await supabase
+        .from('appointments')
+        .select('start_time::text, end_time::text')
+        .eq('appointment_date', dateStr)
+        .neq('status', 'cancelled');
+
+      if (error) throw error;
+
+      // Get working hours
+      const { data: salonData } = await supabase
+        .from('salon_info')
+        .select('working_hours_json')
+        .maybeSingle();
+
+      if (!salonData?.working_hours_json) return;
+
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayOfWeek = dayNames[date.getDay()];
+      const dayHours = salonData.working_hours_json[dayOfWeek];
+
+      if (!dayHours) return;
+
+      const workEndTime = dayHours.end || '18:00';
+      const workEndMinutes = timeToMinutes(workEndTime);
+      const startMinutes = timeToMinutes(startTimeStr);
+
+      // Find consecutive free slots after start time
+      const addMinutes = (timeStr: string, mins: number) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        const total = h * 60 + m + mins;
+        const nh = Math.floor(total / 60);
+        const nm = total % 60;
+        return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
+      };
+
+      let currentTime = addMinutes(startTimeStr, 30);  // Start from 30 mins after start
+      let maxEndTime = workEndTime;
+
+      // Check each 30-minute slot to find where the next appointment starts
+      while (timeToMinutes(currentTime) <= workEndMinutes) {
+        const isOccupied = (appointments || []).some((apt) => {
+          const aptStartMinutes = timeToMinutes(apt.start_time);
+          const aptEndMinutes = timeToMinutes(apt.end_time);
+          const currentMinutes = timeToMinutes(currentTime);
+          return currentMinutes > aptStartMinutes && currentMinutes <= aptEndMinutes;
+        });
+
+        if (isOccupied) {
+          // Found an occupied slot, use its start time as max end time
+          const blockingAppointment = (appointments || []).find((apt) => {
+            const aptStartMinutes = timeToMinutes(apt.start_time);
+            const aptEndMinutes = timeToMinutes(apt.end_time);
+            const currentMinutes = timeToMinutes(currentTime);
+            return currentMinutes > aptStartMinutes && currentMinutes <= aptEndMinutes;
+          });
+          if (blockingAppointment) {
+            maxEndTime = blockingAppointment.start_time;
+          }
+          break;
+        }
+
+        currentTime = addMinutes(currentTime, 30);
+      }
+
+      // Generate end time options from start + 30 mins to max end time
+      const endOptions: string[] = [];
+      let endCur = addMinutes(startTimeStr, 30);
+      while (timeToMinutes(endCur) <= timeToMinutes(maxEndTime)) {
+        endOptions.push(endCur);
+        endCur = addMinutes(endCur, 30);
+      }
+
+      setEndTimeOptions(endOptions);
+      setEndTimePlaceholder('Изберете краен час');
+    } catch (error) {
+      console.error('Error loading end time options:', error);
     }
   };
 
@@ -706,7 +814,11 @@ export default function NewReservationModal2({
                     setShowStartTimePicker(false);
 
                     // Актуализираме опциите за краен час
-                    if (selectedSlotRange) {
+                    if (selectedDate) {
+                      // Use the smart function that checks for occupied slots
+                      loadEndTimeOptionsForStartTime(selectedDate, time);
+                    } else if (selectedSlotRange) {
+                      // Fallback to simple calculation if no date selected yet
                       const addMinutes = (timeStr: string, mins: number) => {
                         const [h, m] = timeStr.split(':').map(Number);
                         const total = h * 60 + m + mins;
@@ -723,9 +835,9 @@ export default function NewReservationModal2({
                         cur = addMinutes(cur, 30);
                       }
                       setEndTimeOptions(newEndOptions);
+                      setEndTime('');
+                      setEndTimePlaceholder('Изберете краен час');
                     }
-                    setEndTime('');
-                    setEndTimePlaceholder('Изберете краен час');
                   }}
                 >
                   <Text style={styles.pickerItemName}>{time}</Text>

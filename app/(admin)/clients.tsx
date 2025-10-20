@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Phone, Mail, MessageCircle, CheckCircle, X, Send, Check, CheckCheck, Calendar, Clock, CheckSquare, XSquare, Bell, Edit, Search, Info, UserPlus } from 'lucide-react-native';
+import { Phone, Mail, MessageCircle, CheckCircle, X, Send, Check, CheckCheck, Edit, Search, Info, UserPlus, XSquare } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,24 +35,6 @@ type Client = {
   is_registered?: boolean;
 };
 
-type AppointmentRequest = {
-  id: string;
-  client_id: string;
-  service_id: string;
-  requested_date: string;
-  requested_time: string;
-  client_message: string;
-  status: string;
-  created_at: string;
-  profiles: {
-    full_name: string;
-    phone: string;
-  };
-  services: {
-    name: string;
-  };
-};
-
 type Message = {
   id: string;
   sender_id: string;
@@ -66,7 +48,6 @@ type Message = {
 export default function ClientsScreen() {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
-  const [requests, setRequests] = useState<AppointmentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -76,7 +57,6 @@ export default function ClientsScreen() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [activeTab, setActiveTab] = useState<'requests' | 'clients'>('requests');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
@@ -88,7 +68,6 @@ export default function ClientsScreen() {
 
   useEffect(() => {
     loadClients();
-    loadRequests();
 
     const clientsChannel = supabase
       .channel('unregistered_clients_changes')
@@ -169,173 +148,6 @@ export default function ClientsScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadRequests = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('appointment_requests')
-        .select(`
-          id,
-          client_id,
-          service_id,
-          requested_date,
-          requested_time::text,
-          client_message,
-          status,
-          created_at,
-          updated_at,
-          profiles(full_name, phone),
-          services(name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setRequests(data || []);
-    } catch (err) {
-      console.error('Error loading requests:', err);
-    }
-  };
-
-  const handleApproveRequest = async (request: AppointmentRequest) => {
-    try {
-      const endTime = calculateEndTime(
-        request.requested_time,
-        request.services.duration_minutes
-      );
-
-      const { error: appointmentError } = await supabase.from('appointments').insert({
-        client_id: request.client_id,
-        service_id: request.service_id,
-        appointment_date: request.requested_date,
-        start_time: request.requested_time,
-        end_time: endTime,
-        status: 'confirmed',
-      });
-
-      if (appointmentError) throw appointmentError;
-
-      const { error: updateError } = await supabase
-        .from('appointment_requests')
-        .update({ status: 'approved' })
-        .eq('id', request.id);
-
-      if (updateError) throw updateError;
-
-      const { error: notifError } = await supabase.from('notifications').insert({
-        user_id: request.client_id,
-        type: 'booking_confirmed',
-        title: 'Заявката е одобрена',
-        body: `${request.services.name} на ${new Date(request.requested_date).toLocaleDateString('bg-BG')} в ${request.requested_time.slice(0, 5)}`,
-      });
-
-      if (notifError) console.error('Notification error:', notifError);
-
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', user?.id)
-        .eq('type', 'new_booking_request')
-        .contains('data', { request_id: request.id });
-
-      loadRequests();
-      Alert.alert('Успех', 'Заявката е одобрена и резервацията е създадена');
-    } catch (err) {
-      console.error('Error approving request:', err);
-      Alert.alert('Грешка', 'Неуспешно одобряване на заявката');
-    }
-  };
-
-  const handleRejectRequest = async (request: AppointmentRequest) => {
-    try {
-      const { error: updateError } = await supabase
-        .from('appointment_requests')
-        .update({ status: 'rejected' })
-        .eq('id', request.id);
-
-      if (updateError) throw updateError;
-
-      const { error: notifError } = await supabase.from('notifications').insert({
-        user_id: request.client_id,
-        type: 'booking_rejected',
-        title: 'Заявката е отхвърлена',
-        body: `${request.services.name} на ${new Date(request.requested_date).toLocaleDateString('bg-BG')} в ${request.requested_time.slice(0, 5)}`,
-      });
-
-      if (notifError) console.error('Notification error:', notifError);
-
-      loadRequests();
-      Alert.alert('Успех', 'Заявката е отхвърлена');
-    } catch (err) {
-      console.error('Error rejecting request:', err);
-      Alert.alert('Грешка', 'Неуспешно отхвърляне на заявката');
-    }
-  };
-
-  const handleDeleteRequest = async (requestId: string) => {
-    console.log('Deleting request:', requestId);
-    try {
-      const { error } = await supabase
-        .from('appointment_requests')
-        .delete()
-        .eq('id', requestId);
-
-      if (error) {
-        console.error('Delete error:', error);
-        throw error;
-      }
-
-      console.log('Request deleted successfully');
-      await loadRequests();
-      Alert.alert('Успех', 'Заявката е изтрита');
-    } catch (err) {
-      console.error('Error deleting request:', err);
-      Alert.alert('Грешка', 'Неуспешно изтриване на заявката');
-    }
-  };
-
-  const handleClearAllRejected = async () => {
-    console.log('Clear all rejected clicked');
-    Alert.alert(
-      'Потвърждение',
-      'Сигурни ли сте, че искате да изтриете всички отхвърлени заявки?',
-      [
-        { text: 'Отказ', style: 'cancel' },
-        {
-          text: 'Изтрий',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('Clearing all rejected requests');
-            try {
-              const { error } = await supabase
-                .from('appointment_requests')
-                .delete()
-                .eq('status', 'rejected');
-
-              if (error) {
-                console.error('Clear all error:', error);
-                throw error;
-              }
-
-              console.log('All rejected requests cleared');
-              await loadRequests();
-              Alert.alert('Успех', 'Всички отхвърлени заявки са изтрити');
-            } catch (err) {
-              console.error('Error clearing rejected requests:', err);
-              Alert.alert('Грешка', 'Неуспешно изтриване на заявките');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const calculateEndTime = (startTime: string, durationMinutes: number): string => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const totalMinutes = hours * 60 + minutes + durationMinutes;
-    const endHours = Math.floor(totalMinutes / 60);
-    const endMinutes = totalMinutes % 60;
-    return `${endHours.toString().padStart(2, '0')}:${endMinutes.toString().padStart(2, '0')}`;
   };
 
   const handleClientPress = (client: Client) => {
@@ -451,7 +263,7 @@ export default function ClientsScreen() {
           const newMessage = payload.new as Message;
           setMessages((prev) => [...prev, newMessage]);
 
-          if (newMessage.sender_id !== profile?.id && !newMessage.read_at) {
+          if (newMessage.sender_id !== user?.id && !newMessage.read_at) {
             await supabase
               .from('messages')
               .update({ read_at: new Date().toISOString() })
@@ -480,7 +292,7 @@ export default function ClientsScreen() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, user?.id]);
 
   const sendMessage = async () => {
     if (!messageText.trim() || !conversationId || !user) return;
@@ -593,74 +405,6 @@ export default function ClientsScreen() {
     </View>
   );
 
-  const renderRequest = ({ item }: { item: AppointmentRequest }) => (
-    <View style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <Text style={styles.requestClientName}>{item.profiles.full_name}</Text>
-        <View style={[
-          styles.requestStatusBadge,
-          { backgroundColor: item.status === 'pending' ? theme.colors.warning : item.status === 'approved' ? theme.colors.success : theme.colors.error }
-        ]}>
-          <Text style={styles.requestStatusText}>
-            {item.status === 'pending' ? 'В очакване' : item.status === 'approved' ? 'Одобрена' : 'Отхвърлена'}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.requestService}>{item.services.name}</Text>
-
-      <View style={styles.requestInfo}>
-        <View style={styles.requestInfoRow}>
-          <Calendar size={16} color={theme.colors.textLight} />
-          <Text style={styles.requestInfoText}>
-            {new Date(item.requested_date).toLocaleDateString('bg-BG')}
-          </Text>
-        </View>
-        <View style={styles.requestInfoRow}>
-          <Clock size={16} color={theme.colors.textLight} />
-          <Text style={styles.requestInfoText}>
-            {item.requested_time.slice(0, 5)}
-          </Text>
-        </View>
-      </View>
-
-      {item.client_message && (
-        <Text style={styles.requestMessage}>"{item.client_message}"</Text>
-      )}
-
-      {item.status === 'pending' && (
-        <View style={styles.requestActions}>
-          <TouchableOpacity
-            style={[styles.requestActionButton, styles.approveButton]}
-            onPress={() => handleApproveRequest(item)}
-          >
-            <CheckSquare size={18} color={theme.colors.surface} />
-            <Text style={styles.requestActionButtonText}>Одобри</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.requestActionButton, styles.rejectButton]}
-            onPress={() => handleRejectRequest(item)}
-          >
-            <XSquare size={18} color={theme.colors.surface} />
-            <Text style={styles.requestActionButtonText}>Откажи</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {item.status === 'rejected' && (
-        <View style={styles.requestActions}>
-          <TouchableOpacity
-            style={[styles.requestActionButton, styles.deleteButton]}
-            onPress={() => handleDeleteRequest(item.id)}
-          >
-            <X size={18} color={theme.colors.surface} />
-            <Text style={styles.requestActionButtonText}>Изтрий</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
   if (loading) {
     return (
       <LinearGradient colors={theme.gradients.champagne} style={styles.container}>
@@ -672,8 +416,6 @@ export default function ClientsScreen() {
       </LinearGradient>
     );
   }
-
-  const pendingRequests = requests.filter(r => r.status === 'pending');
 
   const filteredClients = clients.filter((client) => {
     if (!clientSearchQuery.trim()) return true;
@@ -689,27 +431,7 @@ export default function ClientsScreen() {
     <LinearGradient colors={theme.gradients.champagne} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <View style={styles.headerTop}>
-            <Text style={styles.title}>Клиенти</Text>
-          </View>
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'requests' && styles.tabActive]}
-              onPress={() => setActiveTab('requests')}
-            >
-              <Text style={[styles.tabText, activeTab === 'requests' && styles.tabTextActive]}>
-                Заявки {pendingRequests.length > 0 && `(${pendingRequests.length})`}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'clients' && styles.tabActive]}
-              onPress={() => setActiveTab('clients')}
-            >
-              <Text style={[styles.tabText, activeTab === 'clients' && styles.tabTextActive]}>
-                Клиенти ({clients.length})
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.title}>Клиенти</Text>
         </View>
 
         {error && (
@@ -718,76 +440,45 @@ export default function ClientsScreen() {
           </View>
         )}
 
-        {activeTab === 'clients' && (
-          <>
-            <View style={styles.searchContainer}>
-              <Search size={20} color={theme.colors.textMuted} />
-              <TextInput
-                style={styles.searchInput}
-                value={clientSearchQuery}
-                onChangeText={setClientSearchQuery}
-                placeholder="Търсене по име или телефон..."
-                placeholderTextColor={theme.colors.textMuted}
-              />
-              {clientSearchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setClientSearchQuery('')}>
-                  <X size={20} color={theme.colors.textMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-            <TouchableOpacity
-              style={styles.createClientButton}
-              onPress={() => setShowCreateClientModal(true)}
-            >
-              <UserPlus size={20} color="#fff" />
-              <Text style={styles.createClientButtonText}>Създай клиент</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {activeTab === 'requests' ? (
-          <>
-            {requests.some(r => r.status === 'rejected') && (
-              <View style={styles.clearRejectedContainer}>
-                <TouchableOpacity
-                  style={styles.clearRejectedButton}
-                  onPress={handleClearAllRejected}
-                >
-                  <Text style={styles.clearRejectedText}>Изчисти всички отхвърлени</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            <FlatList
-              data={requests}
-              renderItem={renderRequest}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>Няма заявки за часове</Text>
-                </View>
-              }
-              refreshing={loading}
-              onRefresh={loadRequests}
-            />
-          </>
-        ) : (
-          <FlatList
-            data={filteredClients}
-            renderItem={renderClient}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  {clientSearchQuery.trim() ? 'Няма намерени клиенти' : 'Все още няма клиенти'}
-                </Text>
-              </View>
-            }
-            refreshing={loading}
-            onRefresh={loadClients}
+        <View style={styles.searchContainer}>
+          <Search size={20} color={theme.colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            value={clientSearchQuery}
+            onChangeText={setClientSearchQuery}
+            placeholder="Търсене по име или телефон..."
+            placeholderTextColor={theme.colors.textMuted}
           />
-        )}
+          {clientSearchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setClientSearchQuery('')}>
+              <X size={20} color={theme.colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.createClientButton}
+          onPress={() => setShowCreateClientModal(true)}
+        >
+          <UserPlus size={20} color="#fff" />
+          <Text style={styles.createClientButtonText}>Създай клиент</Text>
+        </TouchableOpacity>
+
+        <FlatList
+          data={filteredClients}
+          renderItem={renderClient}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                {clientSearchQuery.trim() ? 'Няма намерени клиенти' : 'Все още няма клиенти'}
+              </Text>
+            </View>
+          }
+          refreshing={loading}
+          onRefresh={loadClients}
+        />
 
         <Modal
           visible={showActions}
@@ -1153,43 +844,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.md,
-  },
-  notificationButton: {
-    padding: theme.spacing.xs,
-  },
   title: {
     fontSize: theme.fontSize.xxl,
     fontWeight: '700',
     color: theme.colors.text,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    borderRadius: theme.borderRadius.md,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: theme.spacing.sm,
-    alignItems: 'center',
-    borderRadius: theme.borderRadius.sm,
-  },
-  tabActive: {
-    backgroundColor: theme.colors.surface,
-    ...theme.shadows.sm,
-  },
-  tabText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-  },
-  tabTextActive: {
-    color: theme.colors.primary,
   },
   errorContainer: {
     padding: theme.spacing.md,
@@ -1447,104 +1105,6 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: theme.colors.border,
-  },
-  requestCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: theme.borderRadius.sm,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.sm,
-  },
-  requestHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  requestClientName: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: '600',
-    color: theme.colors.text,
-    flex: 1,
-  },
-  requestStatusBadge: {
-    paddingHorizontal: theme.spacing.sm,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.sm,
-  },
-  requestStatusText: {
-    fontSize: theme.fontSize.xs,
-    fontWeight: '600',
-    color: theme.colors.surface,
-  },
-  requestService: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '600',
-    color: theme.colors.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  requestInfo: {
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-    marginBottom: theme.spacing.sm,
-  },
-  requestInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  requestInfoText: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textLight,
-  },
-  requestMessage: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textLight,
-    fontStyle: 'italic',
-    marginBottom: theme.spacing.sm,
-  },
-  requestActions: {
-    flexDirection: 'row',
-    gap: theme.spacing.sm,
-    marginTop: theme.spacing.sm,
-  },
-  requestActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.sm,
-  },
-  approveButton: {
-    backgroundColor: theme.colors.success,
-  },
-  rejectButton: {
-    backgroundColor: theme.colors.error,
-  },
-  deleteButton: {
-    backgroundColor: theme.colors.error,
-  },
-  clearRejectedContainer: {
-    padding: theme.spacing.md,
-    paddingTop: 0,
-  },
-  clearRejectedButton: {
-    backgroundColor: theme.colors.error,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.sm,
-    alignItems: 'center',
-  },
-  clearRejectedText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: '600',
-    color: theme.colors.surface,
-  },
-  requestActionButtonText: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-    color: theme.colors.surface,
   },
   editModalContent: {
     backgroundColor: theme.colors.surface,

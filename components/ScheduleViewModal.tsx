@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { X, Calendar, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
+import ScheduleDatePicker from './ScheduleDatePicker';
 
 type TimeSlot = {
   time: string;
@@ -35,6 +36,7 @@ export default function ScheduleViewModal({
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(false);
   const [workingHours, setWorkingHours] = useState<any>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -76,8 +78,11 @@ export default function ScheduleViewModal({
         return;
       }
 
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(selectedDate);
       const dayOfWeek = selectedDate.getDay();
+
+      console.log('ScheduleViewModal: Loading schedule for:', dateStr);
+      console.log('ScheduleViewModal: Selected date object:', selectedDate);
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const dayHours = workingHours[dayNames[dayOfWeek]];
 
@@ -141,6 +146,22 @@ export default function ScheduleViewModal({
     return hours * 60 + minutes;
   };
 
+  const formatLocalDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatDate = (date: Date): string => {
+    const dayNames = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const dayName = dayNames[date.getDay()];
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2);
+    return `${dayName}, ${day}.${month}.${year}г.`;
+  };
+
   const handlePreviousDay = () => {
     const newDate = new Date(selectedDate);
     newDate.setDate(newDate.getDate() - 1);
@@ -155,7 +176,8 @@ export default function ScheduleViewModal({
 
   const handleSlotPress = (slot: TimeSlot) => {
     if (slot.isAvailable) {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = formatLocalDate(selectedDate);
+      console.log('ScheduleViewModal: Selected slot for date:', dateStr, 'time:', slot.time);
       onSelectSlot(dateStr, slot.time);
       onClose();
     }
@@ -182,16 +204,15 @@ export default function ScheduleViewModal({
               <ChevronLeft size={24} color={theme.colors.primary} />
             </TouchableOpacity>
 
-            <View style={styles.dateDisplay}>
+            <TouchableOpacity
+              style={styles.dateDisplay}
+              onPress={() => setShowDatePicker(true)}
+            >
               <Calendar size={20} color={theme.colors.primary} />
               <Text style={styles.dateText}>
-                {selectedDate.toLocaleDateString('bg-BG', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long'
-                })}
+                {formatDate(selectedDate)}
               </Text>
-            </View>
+            </TouchableOpacity>
 
             <TouchableOpacity onPress={handleNextDay} style={styles.navButton}>
               <ChevronRight size={24} color={theme.colors.primary} />
@@ -259,6 +280,23 @@ export default function ScheduleViewModal({
             </ScrollView>
           )}
         </View>
+
+        <ScheduleDatePicker
+          visible={showDatePicker}
+          onClose={() => setShowDatePicker(false)}
+          onSelectDate={(date) => {
+            // Нормализираме датата за local timezone като използваме UTC компонентите
+            const normalizedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+            console.log('ScheduleViewModal - Original date:', date);
+            console.log('ScheduleViewModal - Normalized date:', normalizedDate);
+            console.log('ScheduleViewModal - Formatted date:', formatLocalDate(normalizedDate));
+            setSelectedDate(normalizedDate);
+            setShowDatePicker(false);
+          }}
+          workingHours={workingHours}
+          allowAnyDate={true}
+          serviceDuration={serviceDuration}
+        />
       </View>
     </Modal>
   );

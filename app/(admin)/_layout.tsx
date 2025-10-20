@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Calendar, Image, Share2, DollarSign, User, Users, Info } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import MessageBadge from '@/components/MessageBadge';
+import RequestsBadge from '@/components/RequestsBadge';
 
 export default function AdminLayout() {
   return (
@@ -34,6 +35,13 @@ export default function AdminLayout() {
         options={{
           title: 'График',
           tabBarIcon: ({ size, color }) => <Calendar size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="requests"
+        options={{
+          title: 'Заявки',
+          tabBarIcon: ({ size, color }) => <RequestsBadge size={size} color={color} />,
         }}
       />
       <Tabs.Screen

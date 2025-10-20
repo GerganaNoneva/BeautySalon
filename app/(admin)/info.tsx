@@ -77,6 +77,40 @@ export default function InfoScreen() {
 
       if (data) {
         setInfo(data);
+      } else {
+        // Create initial record if none exists
+        const defaultWorkingHours: WorkingHours = {
+          monday: { start: '09:00', end: '18:00', closed: false },
+          tuesday: { start: '09:00', end: '18:00', closed: false },
+          wednesday: { start: '09:00', end: '18:00', closed: false },
+          thursday: { start: '09:00', end: '18:00', closed: false },
+          friday: { start: '09:00', end: '18:00', closed: false },
+          saturday: { start: '09:00', end: '18:00', closed: false },
+          sunday: { start: '09:00', end: '18:00', closed: true },
+        };
+
+        const { data: newData, error: insertError } = await supabase
+          .from('salon_info')
+          .insert({
+            salon_name: 'Beauty Salon',
+            phone: '',
+            address: '',
+            latitude: null,
+            longitude: null,
+            google_maps_url: '',
+            instagram_url: '',
+            facebook_url: '',
+            tiktok_url: '',
+            working_hours_json: defaultWorkingHours,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error('Error creating initial salon info:', insertError);
+        } else {
+          setInfo(newData);
+        }
       }
     } catch (err) {
       console.error('Error loading salon info:', err);

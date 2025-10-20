@@ -33,18 +33,6 @@ type TimeSlot = {
   endTime?: string;
 };
 
-type Appointment = {
-  id: string;
-  appointment_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-  client_message: string;
-  services: {
-    name: string;
-  } | null;
-};
-
 type AppointmentRequest = {
   id: string;
   requested_date: string;
@@ -59,7 +47,6 @@ type AppointmentRequest = {
 export default function ClientBookingScreen() {
   const { user } = useAuth();
   const params = useLocalSearchParams();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [requests, setRequests] = useState<AppointmentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showBookingForm, setShowBookingForm] = useState(false);
@@ -103,36 +90,35 @@ export default function ClientBookingScreen() {
     }
   }, [params.prefillDate, params.prefillStartTime, params.prefillEndTime]);
 
+  // Real-time subscription for appointment requests
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const requestsChannel = supabase
+      .channel('client_booking_requests_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointment_requests',
+          filter: `client_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Booking: Request change detected:', payload);
+          loadRequests();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(requestsChannel);
+    };
+  }, [user?.id]);
+
   const loadData = async () => {
-    await Promise.all([loadAppointments(), loadRequests(), loadServices()]);
+    await Promise.all([loadRequests(), loadServices()]);
     setLoading(false);
-  };
-
-  const loadAppointments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          client_id,
-          service_id,
-          appointment_date,
-          start_time::text,
-          end_time::text,
-          client_message,
-          created_at,
-          updated_at,
-          services(name)
-        `)
-        .eq('client_id', user?.id)
-        .order('appointment_date', { ascending: false })
-        .order('start_time', { ascending: false });
-
-      if (error) throw error;
-      setAppointments(data || []);
-    } catch (error) {
-      console.error('Error loading appointments:', error);
-    }
   };
 
   const loadRequests = async () => {
@@ -152,6 +138,7 @@ export default function ClientBookingScreen() {
           services(name)
         `)
         .eq('client_id', user?.id)
+        .in('status', ['pending', 'rejected'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -176,6 +163,7 @@ export default function ClientBookingScreen() {
   };
 
   const findAvailableSlots = async (service: Service) => {
+    console.log('🔍 Finding available slots for service:', service.name);
     setLoadingSlots(true);
     try {
       const slots: TimeSlot[] = [];
@@ -187,31 +175,56 @@ export default function ClientBookingScreen() {
         const dateStr = checkDate.toISOString().split('T')[0];
 
         const daySlots = await getAvailableSlotsForDay(dateStr, service.duration_minutes);
+        console.log(`📅 Day ${dateStr}: found ${daySlots.length} slots`);
         slots.push(...daySlots);
 
         if (slots.length >= 10) break;
       }
 
+      console.log(`✅ Total available slots found: ${slots.length}`);
       setAvailableSlots(slots.slice(0, 10));
       if (slots.length > 0) {
         setSelectedSlot(slots[0]);
+      } else {
+        console.warn('⚠️ No available slots found!');
+        Alert.alert('Внимание', 'Няма налични свободни часове в следващите 30 дни. Моля, свържете се със салона директно.');
       }
     } catch (error) {
-      console.error('Error finding slots:', error);
+      console.error('❌ Error finding slots:', error);
+      Alert.alert('Грешка', 'Възникна грешка при търсенето на свободни часове');
     } finally {
+      console.log('🏁 Finished loading slots');
       setLoadingSlots(false);
     }
   };
 
   const getAvailableSlotsForDay = async (date: string, durationMinutes: number): Promise<TimeSlot[]> => {
-    const { data: workingHoursData } = await supabase
+    console.log(`🔎 Getting slots for date: ${date}, duration: ${durationMinutes}min`);
+
+    const { data: workingHoursData, error: workingHoursError } = await supabase
       .from('salon_info')
       .select('working_hours_json')
       .maybeSingle();
 
-    if (!workingHoursData?.working_hours_json) {
+    if (workingHoursError) {
+      console.error('❌ Error loading working hours:', workingHoursError);
       return [];
     }
+
+    // Default working hours if not configured
+    const defaultWorkingHours = {
+      monday: { start: '09:00', end: '18:00', closed: false },
+      tuesday: { start: '09:00', end: '18:00', closed: false },
+      wednesday: { start: '09:00', end: '18:00', closed: false },
+      thursday: { start: '09:00', end: '18:00', closed: false },
+      friday: { start: '09:00', end: '18:00', closed: false },
+      saturday: { start: '09:00', end: '18:00', closed: false },
+      sunday: { start: '09:00', end: '18:00', closed: true },
+    };
+
+    const workingHoursJson = workingHoursData?.working_hours_json || defaultWorkingHours;
+
+    console.log('✅ Working hours loaded:', workingHoursJson);
 
     const checkDate = new Date(date);
     const today = new Date();
@@ -220,9 +233,13 @@ export default function ClientBookingScreen() {
 
     const dayOfWeek = checkDate.getDay();
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayHours = workingHoursData.working_hours_json[dayNames[dayOfWeek]];
+    const dayName = dayNames[dayOfWeek];
+    const dayHours = workingHoursJson[dayName];
+
+    console.log(`📆 Day: ${dayName} (${dayOfWeek}), Hours:`, dayHours);
 
     if (!dayHours || dayHours.closed) {
+      console.log(`❌ Salon closed on ${dayName}`);
       return [];
     }
 
@@ -388,21 +405,8 @@ export default function ClientBookingScreen() {
         throw error;
       }
 
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin');
-
-      if (admins) {
-        const notifications = admins.map((admin) => ({
-          user_id: admin.id,
-          type: 'appointment_request',
-          title: 'Нова заявка за час',
-          body: `${selectedService.name} - ${new Date(selectedSlot.date).toLocaleDateString('bg-BG')} в ${selectedSlot.time}`,
-        }));
-
-        await supabase.from('notifications').insert(notifications);
-      }
+      // Database trigger automatically creates notification for admin
+      // No need to manually insert notification here
 
       setMessage('');
       setShowBookingForm(false);
@@ -751,49 +755,6 @@ export default function ClientBookingScreen() {
                       <X size={16} color={theme.colors.surface} />
                       <Text style={styles.deleteButtonText}>Изтрий</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
-              ))
-            )}
-
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Потвърдени резервации</Text>
-            </View>
-            {appointments.length === 0 ? (
-              <Text style={styles.emptyText}>Няма резервации</Text>
-            ) : (
-              appointments.map((appointment) => (
-                <View key={appointment.id} style={styles.appointmentCard}>
-                  <View style={styles.appointmentHeader}>
-                    {appointment.services && (
-                      <Text style={styles.serviceName}>{appointment.services.name}</Text>
-                    )}
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: getStatusColor(appointment.status) },
-                      ]}
-                    >
-                      <Text style={styles.statusText}>
-                        {getStatusText(appointment.status)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.dateInfo}>
-                    <Calendar size={18} color={theme.colors.textLight} />
-                    <Text style={styles.dateText}>
-                      {new Date(appointment.appointment_date).toLocaleDateString('bg-BG')}
-                    </Text>
-                  </View>
-                  <View style={styles.timeInfo}>
-                    <Clock size={18} color={theme.colors.textLight} />
-                    <Text style={styles.timeText}>
-                      {appointment.start_time.slice(0, 5)} -{' '}
-                      {appointment.end_time.slice(0, 5)}
-                    </Text>
-                  </View>
-                  {appointment.client_message && (
-                    <Text style={styles.clientMessage}>{appointment.client_message}</Text>
                   )}
                 </View>
               ))

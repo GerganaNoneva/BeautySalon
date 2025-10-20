@@ -25,6 +25,7 @@ import FreeSlotNotificationModal from '@/components/FreeSlotNotificationModal';
 import ReservationModal from '@/components/ReservationModal';
 import NotificationBadge from '@/components/NotificationBadge';
 import { VoiceRecorder } from '@/components/VoiceRecorder';
+import NextFreeTimeSlotsModal from '@/components/NextFreeTimeSlotsModal';
 
 type Appointment = {
   id: string;
@@ -79,6 +80,9 @@ export default function AdminScheduleScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
+  const [showNextFreeSlotsModal, setShowNextFreeSlotsModal] = useState(false);
+  const [preselectedDate, setPreselectedDate] = useState<Date | null>(null);
+  const [preselectedTime, setPreselectedTime] = useState<string | null>(null);
 
   useEffect(() => {
     loadWorkingHours();
@@ -86,6 +90,29 @@ export default function AdminScheduleScreen() {
 
   useEffect(() => {
     loadAppointments();
+
+    // Real-time subscription for appointments
+    const appointmentsChannel = supabase
+      .channel('admin_schedule_appointments_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+        },
+        (payload) => {
+          console.log("🔴 ADMIN SCHEDULE REAL-TIME EVENT:", payload.eventType, payload.new);
+          loadAppointments();
+        }
+      )
+      .subscribe((status) => {
+        console.log('🟣 Admin Schedule: Subscription status:', status);
+      });
+
+    return () => {
+      supabase.removeChannel(appointmentsChannel);
+    };
   }, [selectedDate]);
 
   useEffect(() => {
@@ -323,6 +350,13 @@ export default function AdminScheduleScreen() {
   const handleVoiceTranscription = (data: { text: string; parsed: any }) => {
   };
 
+  const handleSelectFreeSlot = (slot: { date: Date; time: string; dateStr: string }) => {
+    setPreselectedDate(slot.date);
+    setPreselectedTime(slot.time);
+    setSelectedDate(slot.date);
+    setShowNewReservationModal2(true);
+  };
+
   const handleCallClient = (phone: string) => {
     if (phone) {
       Linking.openURL(`tel:${phone}`);
@@ -526,12 +560,7 @@ export default function AdminScheduleScreen() {
 
         <TouchableOpacity
           style={styles.voiceActionButton}
-          onPress={() =>
-            Alert.alert(
-              'Гласови резервации',
-              'Можете да използвате микрофона за гласови резервации. Кажете име на клиент, услуга, дата и час.'
-            )
-          }
+          onPress={() => setShowNextFreeSlotsModal(true)}
         >
           <Info size={24} color={theme.colors.primary} />
         </TouchableOpacity>
@@ -723,14 +752,22 @@ export default function AdminScheduleScreen() {
       {/* New Separate Reservation Modal from + button */}
       <NewReservationModal2
         visible={showNewReservationModal2}
-        onClose={() => setShowNewReservationModal2(false)}
+        onClose={() => {
+          setShowNewReservationModal2(false);
+          setPreselectedDate(null);
+          setPreselectedTime(null);
+        }}
         onConfirm={(date) => {
           setShowNewReservationModal2(false);
+          setPreselectedDate(null);
+          setPreselectedTime(null);
           if (date) {
             setSelectedDate(date);
           }
           loadAppointments();
         }}
+        preselectedDate={preselectedDate}
+        preselectedTime={preselectedTime}
       />
 
       <ReservationModal
@@ -958,6 +995,12 @@ export default function AdminScheduleScreen() {
           </View>
         </View>
       </Modal>
+
+      <NextFreeTimeSlotsModal
+        visible={showNextFreeSlotsModal}
+        onClose={() => setShowNextFreeSlotsModal(false)}
+        onSelectSlot={handleSelectFreeSlot}
+      />
     </View>
   );
 }

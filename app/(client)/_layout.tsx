@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Calendar, Image, DollarSign, User, Info } from 'lucide-react-native';
+import { Calendar, Image, DollarSign, User, Info, CheckCircle } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import MessageBadge from '@/components/MessageBadge';
 
@@ -29,6 +29,19 @@ export default function ClientLayout() {
         },
       }}
     >
+      <Tabs.Screen
+        name="appointments"
+        options={{
+          title: 'Резервации',
+          tabBarIcon: ({ size, color }) => <CheckCircle size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="requests"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="booking"
         options={{

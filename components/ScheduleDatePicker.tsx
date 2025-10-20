@@ -29,6 +29,7 @@ type ScheduleDatePickerProps = {
   };
   excludeAppointmentId?: string;
   allowAnyDate?: boolean; // Позволява избор на всяка дата (за админи)
+  serviceDuration?: number; // Продължителност на услугата в минути
 };
 
 type DateAvailability = {
@@ -43,6 +44,7 @@ export default function ScheduleDatePicker({
   workingHours,
   excludeAppointmentId,
   allowAnyDate = false,
+  serviceDuration = 30,
 }: ScheduleDatePickerProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availability, setAvailability] = useState<Record<string, boolean>>({});
@@ -86,8 +88,21 @@ export default function ScheduleDatePicker({
 
       if (salonError) throw salonError;
 
+      // Default working hours if not configured
+      const defaultWorkingHours = {
+        monday: { start: '09:00', end: '18:00', closed: false },
+        tuesday: { start: '09:00', end: '18:00', closed: false },
+        wednesday: { start: '09:00', end: '18:00', closed: false },
+        thursday: { start: '09:00', end: '18:00', closed: false },
+        friday: { start: '09:00', end: '18:00', closed: false },
+        saturday: { start: '09:00', end: '18:00', closed: false },
+        sunday: { start: '09:00', end: '18:00', closed: true },
+      };
+
+      const workingHoursJson = salonInfo?.working_hours_json || defaultWorkingHours;
+
       console.log('\n🏢 SALON WORKING HOURS FROM DATABASE:');
-      console.log(JSON.stringify(salonInfo?.working_hours_json, null, 2));
+      console.log(JSON.stringify(workingHoursJson, null, 2));
 
       const availabilityMap: Record<string, boolean> = {};
       const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -102,7 +117,7 @@ export default function ScheduleDatePicker({
         const dateStr = formatLocalDate(d);
         const jsDay = d.getDay();
         const dayOfWeek = dayNames[jsDay];
-        const dayHours = salonInfo?.working_hours_json?.[dayOfWeek];
+        const dayHours = workingHoursJson?.[dayOfWeek];
 
         console.log(`\n📌 Day ${i + 1}: ${dateStr} - JS getDay()=${jsDay} -> dayName='${dayOfWeek}'`);
         console.log(`   Working hours for ${dayOfWeek}:`, dayHours);
@@ -120,7 +135,7 @@ export default function ScheduleDatePicker({
         };
 
         const dayAppointments = appointments?.filter(apt => apt.appointment_date === dateStr) || [];
-        const hasFreeSlots = checkIfHasFreeSlots(dayAppointments, hours, dateStr);
+        const hasFreeSlots = checkIfHasFreeSlots(dayAppointments, hours, serviceDuration, dateStr);
         availabilityMap[dateStr] = hasFreeSlots;
       }
 
@@ -136,7 +151,7 @@ export default function ScheduleDatePicker({
     }
   };
 
-  const checkIfHasFreeSlots = (dayAppointments: any[], hours: { start: string; end: string }, dateStr?: string) => {
+  const checkIfHasFreeSlots = (dayAppointments: any[], hours: { start: string; end: string }, duration: number, dateStr?: string) => {
     const [startHour, startMinute] = hours.start.split(':').map(Number);
     const [endHour, endMinute] = hours.end.split(':').map(Number);
 
@@ -152,17 +167,21 @@ export default function ScheduleDatePicker({
     if (dateStr) {
       console.log(`\n=== CHECKING ${dateStr} ===`);
       console.log('Work hours:', hours.start, '-', hours.end);
+      console.log('Service duration:', duration, 'minutes');
       console.log('Appointments:', dayAppointments.length);
       console.log('Occupied slots:', occupiedSlots);
     }
 
     let freeSlotFound = false;
-    for (let time = workStartMinutes; time < workEndMinutes - 30; time += 30) {
+    for (let time = workStartMinutes; time + duration <= workEndMinutes; time += 30) {
+      const slotEndTime = time + duration;
       const isFree = !occupiedSlots.some(([start, end]) =>
-        time >= start && time < end
+        (time >= start && time < end) ||
+        (slotEndTime > start && slotEndTime <= end) ||
+        (time <= start && slotEndTime >= end)
       );
       if (isFree) {
-        if (dateStr) console.log(`FREE SLOT at ${Math.floor(time/60)}:${(time%60).toString().padStart(2,'0')}`);
+        if (dateStr) console.log(`FREE SLOT at ${Math.floor(time/60)}:${(time%60).toString().padStart(2,'0')} (duration: ${duration}min)`);
         freeSlotFound = true;
         break;
       }
@@ -207,10 +226,12 @@ export default function ScheduleDatePicker({
   };
 
   const handleSelectDate = (date: Date) => {
-    console.log('ScheduleDatePicker - Selected date object:', date);
-    console.log('ScheduleDatePicker - Date ISO string:', date.toISOString());
-    console.log('ScheduleDatePicker - Date local string:', date.toLocaleDateString());
-    onSelectDate(date);
+    // Вземаме local компонентите и създаваме UTC дата на полунощ
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    console.log('ScheduleDatePicker - Original local date:', date);
+    console.log('ScheduleDatePicker - UTC date:', utcDate);
+    console.log('ScheduleDatePicker - Date ISO string:', utcDate.toISOString());
+    onSelectDate(utcDate);
     onClose();
   };
 

@@ -331,11 +331,14 @@ export default function ReservationModal({
   };
 
   const handleDateSelect = async (date: Date) => {
+    // Нормализираме датата за local timezone като използваме UTC компонентите
+    const normalizedDate = new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
     console.log('ReservationModal - Received date object:', date);
-    console.log('ReservationModal - Date ISO string:', date.toISOString());
-    console.log('ReservationModal - Date local string:', date.toLocaleDateString());
-    setEditDate(date);
-    await loadWorkingHoursForDate(date);
+    console.log('ReservationModal - Normalized date:', normalizedDate);
+    console.log('ReservationModal - Date ISO string:', normalizedDate.toISOString());
+    console.log('ReservationModal - Date local string:', normalizedDate.toLocaleDateString());
+    setEditDate(normalizedDate);
+    await loadWorkingHoursForDate(normalizedDate);
     setShowSlotsPicker(true);
   };
 
@@ -1238,6 +1241,7 @@ export default function ReservationModal({
         onSelectDate={handleDateSelect}
         workingHours={workingHours}
         excludeAppointmentId={editingAppointment?.id}
+        serviceDuration={selectedService?.duration_minutes || 30}
       />
 
       <FreeTimeSlotsModal

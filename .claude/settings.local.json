@@ -18,7 +18,21 @@
       "Bash(npx supabase db push:*)",
       "Bash(node scripts/checkDuplicateNotifications.js:*)",
       "Bash(node scripts/cleanupDuplicateNotifications.js:*)",
-      "Bash(node scripts/testMessageTriggers.js:*)"
+      "Bash(node scripts/testMessageTriggers.js:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(node scripts/check28Oct.js:*)",
+      "Bash(tail:*)",
+      "Bash(npx expo start:*)",
+      "Bash(wc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(node scripts/checkWorkingHours.js:*)",
+      "Bash(node scripts/initWorkingHours.js:*)",
+      "Bash(node:*)",
+      "Bash(if exist .expo rmdir /s /q .expo)",
+      "Bash(if exist node_modules.cache rmdir /s /q node_modules.cache)",
+      "Bash(timeout:*)",
+      "Bash(tasklist:*)"
     ],
     "deny": [],
     "ask": []

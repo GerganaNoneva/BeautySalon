@@ -160,6 +160,14 @@ export default function NotificationsModal({ visible, onClose }: NotificationsMo
         } else {
           router.push('/(client)/pricing');
         }
+      } else if (notification.type === 'new_booking_request' && notification.data?.request_id) {
+        onClose();
+        // Navigate to admin requests screen
+        router.push('/(admin)/requests');
+      } else if (notification.type === 'booking_rejected' || notification.type === 'booking_confirmed') {
+        onClose();
+        // Navigate to client appointments screen
+        router.push('/(client)/appointments');
       }
     } catch (error) {
       console.error('Error handling notification press:', error);
