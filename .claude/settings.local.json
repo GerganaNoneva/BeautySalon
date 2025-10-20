@@ -32,7 +32,8 @@
       "Bash(if exist .expo rmdir /s /q .expo)",
       "Bash(if exist node_modules.cache rmdir /s /q node_modules.cache)",
       "Bash(timeout:*)",
-      "Bash(tasklist:*)"
+      "Bash(tasklist:*)",
+      "Bash(npx expo install:*)"
     ],
     "deny": [],
     "ask": []

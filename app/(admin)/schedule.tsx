@@ -25,7 +25,10 @@ import FreeSlotNotificationModal from '@/components/FreeSlotNotificationModal';
 import ReservationModal from '@/components/ReservationModal';
 import NotificationBadge from '@/components/NotificationBadge';
 import { VoiceRecorder } from '@/components/VoiceRecorder';
+import { RealtimeVoiceRecorder } from '@/components/RealtimeVoiceRecorder';
 import NextFreeTimeSlotsModal from '@/components/NextFreeTimeSlotsModal';
+import { ParsedVoiceCommand } from '@/utils/voiceCommandParser';
+import { handleVoiceCommand } from '@/utils/voiceCommandHandlers';
 
 type Appointment = {
   id: string;
@@ -350,6 +353,22 @@ export default function AdminScheduleScreen() {
   const handleVoiceTranscription = (data: { text: string; parsed: any }) => {
   };
 
+  // Handler за гласови команди
+  const onVoiceCommand = async (command: ParsedVoiceCommand) => {
+    await handleVoiceCommand(command, {
+      setSelectedDate,
+      setShowNextFreeSlotsModal,
+      setShowNewReservationModal2,
+      setPreselectedDate,
+      setPreselectedTime,
+      selectedDate,
+      appointments,
+      workingHours,
+      router,
+      userId: user?.id || '',
+    });
+  };
+
   const handleSelectFreeSlot = (slot: { date: Date; time: string; dateStr: string }) => {
     setPreselectedDate(slot.date);
     setPreselectedTime(slot.time);
@@ -556,7 +575,10 @@ export default function AdminScheduleScreen() {
           <Plus size={24} color={theme.colors.primary} />
         </TouchableOpacity>
 
-        <VoiceRecorder onTranscriptionComplete={handleVoiceTranscription} />
+        <RealtimeVoiceRecorder
+          onCommand={onVoiceCommand}
+          openAiApiKey={process.env.EXPO_PUBLIC_OPENAI_API_KEY || ''}
+        />
 
         <TouchableOpacity
           style={styles.voiceActionButton}

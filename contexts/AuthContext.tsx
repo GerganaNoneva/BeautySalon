@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { registerForPushNotificationsAsync, savePushToken } from '@/lib/notifications';
+import * as Linking from 'expo-linking';
 
 type Profile = {
   id: string;
@@ -145,23 +147,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    return { error };
+    try {
+      // Получаваме правилния redirect URL за платформата
+      const redirectUrl = Platform.OS === 'web'
+        ? window.location.origin
+        : Linking.createURL('/');
+
+      console.log('Google Sign-In redirect URL:', redirectUrl);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      return { error };
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      return { error };
+    }
   };
 
   const signInWithFacebook = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'facebook',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    return { error };
+    try {
+      // Получаваме правилния redirect URL за платформата
+      const redirectUrl = Platform.OS === 'web'
+        ? window.location.origin
+        : Linking.createURL('/');
+
+      console.log('Facebook Sign-In redirect URL:', redirectUrl);
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'facebook',
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: Platform.OS !== 'web',
+        },
+      });
+
+      return { error };
+    } catch (error) {
+      console.error('Facebook Sign-In error:', error);
+      return { error };
+    }
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
