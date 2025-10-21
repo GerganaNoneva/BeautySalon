@@ -195,7 +195,7 @@ export default function ClientMessagesScreen() {
       }
 
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
       }, 100);
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -345,7 +345,7 @@ export default function ClientMessagesScreen() {
         setMessages(prev => [...prev, data[0] as Message]);
 
         setTimeout(() => {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
         }, 100);
       }
 
@@ -413,8 +413,8 @@ export default function ClientMessagesScreen() {
               contentContainerStyle={styles.messagesContent}
               onEndReached={loadOlderMessages}
               onEndReachedThreshold={0.5}
-              inverted={false}
-              ListHeaderComponent={
+              inverted={true}
+              ListFooterComponent={
                 loadingMore ? (
                   <View style={styles.loadingMoreContainer}>
                     <ActivityIndicator size="small" color={theme.colors.primary} />

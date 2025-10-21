@@ -235,7 +235,7 @@ export default function MessagesScreen() {
       }
 
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
       }, 100);
 
       await supabase
@@ -386,7 +386,7 @@ export default function MessagesScreen() {
       console.log('✅ Message sent successfully');
 
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       }, 100);
     } catch (err) {
       console.error('❌ Error sending message full object:', err);
@@ -826,10 +826,10 @@ export default function MessagesScreen() {
                 renderItem={renderMessage}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.messagesContent}
-                inverted={false}
+                inverted={true}
                 onEndReached={loadOlderMessages}
                 onEndReachedThreshold={0.5}
-                ListHeaderComponent={
+                ListFooterComponent={
                   loadingMore ? (
                     <View style={styles.loadingMoreContainer}>
                       <ActivityIndicator size="small" color={theme.colors.primary} />
