@@ -839,10 +839,11 @@ export default function MessagesScreen() {
               </View>
 
               <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={0}
                 style={{ flex: 1 }}
               >
+                <>
               <FlatList
                 ref={flatListRef}
                 data={messages}
@@ -927,6 +928,7 @@ export default function MessagesScreen() {
                     )}
                   </TouchableOpacity>
                 </View>
+                </>
               </KeyboardAvoidingView>
             </SafeAreaView>
           </LinearGradient>

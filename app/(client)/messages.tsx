@@ -421,7 +421,11 @@ export default function ClientMessagesScreen() {
           <ActivityIndicator size="large" color={theme.colors.primary} />
         </View>
       ) : (
-        <View style={styles.contentContainer}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
           <>
             <FlatList
               ref={flatListRef}
@@ -592,7 +596,7 @@ export default function ClientMessagesScreen() {
               </TouchableOpacity>
             </View>
           </>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       <MessageAttachmentPicker
