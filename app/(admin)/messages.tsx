@@ -74,8 +74,6 @@ export default function MessagesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [oldestMessageId, setOldestMessageId] = useState<string | null>(null);
-  const scrollOffsetRef = useRef(0);
-  const contentHeightRef = useRef(0);
 
   useEffect(() => {
     loadConversations();
@@ -270,25 +268,18 @@ export default function MessagesScreen() {
 
       if (data && data.length > 0) {
         const sortedOldMessages = data.reverse();
-        const oldContentHeight = contentHeightRef.current;
-        const oldScrollOffset = scrollOffsetRef.current;
 
         setMessages(prev => [...sortedOldMessages, ...prev]);
         setOldestMessageId(sortedOldMessages[0].id);
         setHasMore(data.length === 10);
 
-        // After new messages are added, maintain scroll position
-        // by calculating the height difference
-        requestAnimationFrame(() => {
-          const newContentHeight = contentHeightRef.current;
-          const heightDifference = newContentHeight - oldContentHeight;
-          const newScrollOffset = oldScrollOffset + heightDifference;
-
+        // Scroll to the top (oldest loaded messages) after loading
+        setTimeout(() => {
           flatListRef.current?.scrollToOffset({
-            offset: newScrollOffset,
-            animated: false,
+            offset: 0,
+            animated: true,
           });
-        });
+        }, 100);
       } else {
         setHasMore(false);
       }
@@ -852,15 +843,11 @@ export default function MessagesScreen() {
                 contentContainerStyle={styles.messagesContent}
                 onScroll={(event) => {
                   const offsetY = event.nativeEvent.contentOffset.y;
-                  scrollOffsetRef.current = offsetY;
 
                   // Load older messages when scrolling near the top
                   if (offsetY < 100 && !loadingMore && hasMore) {
                     loadOlderMessages();
                   }
-                }}
-                onContentSizeChange={(width, height) => {
-                  contentHeightRef.current = height;
                 }}
                 scrollEventThrottle={400}
                 inverted={false}
