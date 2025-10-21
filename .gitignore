@@ -33,3 +33,10 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+google-services.json
+credentials.json
+books-*-firebase-adminsdk-*.json
+*.keystore
+*.jks
+.env
+.env.*
