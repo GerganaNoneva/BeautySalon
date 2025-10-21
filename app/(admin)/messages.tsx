@@ -829,6 +829,10 @@ export default function MessagesScreen() {
                 inverted={true}
                 onEndReached={loadOlderMessages}
                 onEndReachedThreshold={0.5}
+                maintainVisibleContentPosition={{
+                  minIndexForVisible: 0,
+                  autoscrollToTopThreshold: 10,
+                }}
                 ListFooterComponent={
                   loadingMore ? (
                     <View style={styles.loadingMoreContainer}>

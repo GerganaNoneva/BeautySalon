@@ -414,6 +414,10 @@ export default function ClientMessagesScreen() {
               onEndReached={loadOlderMessages}
               onEndReachedThreshold={0.5}
               inverted={true}
+              maintainVisibleContentPosition={{
+                minIndexForVisible: 0,
+                autoscrollToTopThreshold: 10,
+              }}
               ListFooterComponent={
                 loadingMore ? (
                   <View style={styles.loadingMoreContainer}>
