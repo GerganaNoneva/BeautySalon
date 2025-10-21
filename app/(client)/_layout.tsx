@@ -2,8 +2,11 @@ import { Tabs } from 'expo-router';
 import { Calendar, Image, DollarSign, User, Info, CheckCircle } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import MessageBadge from '@/components/MessageBadge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ClientLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,8 +21,8 @@ export default function ClientLayout() {
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.1,
           shadowRadius: 8,
-          height: 70,
-          paddingBottom: 10,
+          height: 70 + insets.bottom,
+          paddingBottom: insets.bottom + 10,
           paddingTop: 10,
         },
         tabBarLabelStyle: {

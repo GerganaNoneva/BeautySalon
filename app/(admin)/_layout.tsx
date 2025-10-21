@@ -3,8 +3,11 @@ import { Calendar, Image, Share2, DollarSign, User, Users, Info } from 'lucide-r
 import { theme } from '@/constants/theme';
 import MessageBadge from '@/components/MessageBadge';
 import RequestsBadge from '@/components/RequestsBadge';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AdminLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -19,8 +22,8 @@ export default function AdminLayout() {
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.1,
           shadowRadius: 8,
-          height: 70,
-          paddingBottom: 10,
+          height: 70 + insets.bottom,
+          paddingBottom: insets.bottom + 10,
           paddingTop: 10,
         },
         tabBarLabelStyle: {
