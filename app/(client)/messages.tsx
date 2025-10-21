@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
@@ -48,8 +48,11 @@ export default function ClientMessagesScreen() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<Attachment | null>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const flatListRef = useRef<any>(null);
   const isFocused = useRef(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [oldestMessageId, setOldestMessageId] = useState<string | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -168,6 +171,7 @@ export default function ClientMessagesScreen() {
 
   const loadMessages = async (convId: string) => {
     try {
+      // Load only the last 10 messages
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -175,19 +179,63 @@ export default function ClientMessagesScreen() {
           profiles!messages_sender_id_fkey(full_name, role)
         `)
         .eq('conversation_id', convId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       if (error) throw error;
 
-      setMessages(data || []);
+      const sortedMessages = (data || []).reverse();
+      setMessages(sortedMessages);
+
+      if (sortedMessages.length > 0) {
+        setOldestMessageId(sortedMessages[0].id);
+        setHasMore(data && data.length === 10);
+      } else {
+        setHasMore(false);
+      }
 
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    if (!conversationId || !hasMore || loadingMore || !oldestMessageId) return;
+
+    setLoadingMore(true);
+    try {
+      const oldestMessage = messages[0];
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          profiles!messages_sender_id_fkey(full_name, role)
+        `)
+        .eq('conversation_id', conversationId)
+        .lt('created_at', oldestMessage.created_at)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const sortedOldMessages = data.reverse();
+        setMessages(prev => [...sortedOldMessages, ...prev]);
+        setOldestMessageId(sortedOldMessages[0].id);
+        setHasMore(data.length === 10);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -357,20 +405,35 @@ export default function ClientMessagesScreen() {
       ) : (
         <View style={styles.contentContainer}>
           <>
-              <ScrollView
-                ref={scrollViewRef}
-                style={styles.messagesContainer}
-                contentContainerStyle={styles.messagesContent}
-                onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-              >
-            {messages.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>
-                  Все още няма съобщения. Започнете разговор!
-                </Text>
-              </View>
-            ) : (
-              messages.map((message) => (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id}
+              style={styles.messagesContainer}
+              contentContainerStyle={styles.messagesContent}
+              onEndReached={loadOlderMessages}
+              onEndReachedThreshold={0.5}
+              inverted={false}
+              ListHeaderComponent={
+                loadingMore ? (
+                  <View style={styles.loadingMoreContainer}>
+                    <ActivityIndicator size="small" color={theme.colors.primary} />
+                    <Text style={styles.loadingMoreText}>Зареждане на стари съобщения...</Text>
+                  </View>
+                ) : !hasMore && messages.length > 0 ? (
+                  <View style={styles.endOfMessagesContainer}>
+                    <Text style={styles.endOfMessagesText}>Началото на разговора</Text>
+                  </View>
+                ) : null
+              }
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>
+                    Все още няма съобщения. Започнете разговор!
+                  </Text>
+                </View>
+              }
+              renderItem={({ item: message }) => (
                 <View
                   key={message.id}
                   style={[
@@ -448,9 +511,8 @@ export default function ClientMessagesScreen() {
                     )}
                   </View>
                 </View>
-              ))
-            )}
-          </ScrollView>
+              )}
+            />
 
           {selectedAttachment && (
             <View style={styles.attachmentPreview}>
@@ -676,5 +738,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.sm,
+  },
+  loadingMoreContainer: {
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  loadingMoreText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textMuted,
+  },
+  endOfMessagesContainer: {
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  endOfMessagesText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
 });

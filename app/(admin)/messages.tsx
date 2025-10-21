@@ -71,6 +71,9 @@ export default function MessagesScreen() {
   const [showUnregisteredModal, setShowUnregisteredModal] = useState(false);
   const [unregisteredClient, setUnregisteredClient] = useState<Client | null>(null);
   const flatListRef = useRef<FlatList>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [oldestMessageId, setOldestMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     loadConversations();
@@ -211,18 +214,28 @@ export default function MessagesScreen() {
 
   const loadMessages = async (conversationId: string) => {
     try {
+      // Load only the last 10 messages
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       if (error) throw error;
 
-      setMessages(data || []);
+      const sortedMessages = (data || []).reverse();
+      setMessages(sortedMessages);
+
+      if (sortedMessages.length > 0) {
+        setOldestMessageId(sortedMessages[0].id);
+        setHasMore(data && data.length === 10);
+      } else {
+        setHasMore(false);
+      }
 
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
+        flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
 
       await supabase
@@ -233,6 +246,38 @@ export default function MessagesScreen() {
         .is('read_at', null);
     } catch (err) {
       console.error('Error loading messages:', err);
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    if (!selectedConversation || !hasMore || loadingMore || !oldestMessageId) return;
+
+    setLoadingMore(true);
+    try {
+      const oldestMessage = messages[0];
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedConversation.id)
+        .lt('created_at', oldestMessage.created_at)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const sortedOldMessages = data.reverse();
+        setMessages(prev => [...sortedOldMessages, ...prev]);
+        setOldestMessageId(sortedOldMessages[0].id);
+        setHasMore(data.length === 10);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -782,7 +827,20 @@ export default function MessagesScreen() {
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.messagesContent}
                 inverted={false}
-                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                onEndReached={loadOlderMessages}
+                onEndReachedThreshold={0.5}
+                ListHeaderComponent={
+                  loadingMore ? (
+                    <View style={styles.loadingMoreContainer}>
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
+                      <Text style={styles.loadingMoreText}>Зареждане на стари съобщения...</Text>
+                    </View>
+                  ) : !hasMore && messages.length > 0 ? (
+                    <View style={styles.endOfMessagesContainer}>
+                      <Text style={styles.endOfMessagesText}>Началото на разговора</Text>
+                    </View>
+                  ) : null
+                }
               />
 
               <KeyboardAvoidingView
@@ -1273,5 +1331,25 @@ const styles = StyleSheet.create({
   emptyClientsText: {
     fontSize: theme.fontSize.md,
     color: theme.colors.textMuted,
+  },
+  loadingMoreContainer: {
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  loadingMoreText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textMuted,
+  },
+  endOfMessagesContainer: {
+    paddingVertical: theme.spacing.md,
+    alignItems: 'center',
+  },
+  endOfMessagesText: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.textMuted,
+    fontStyle: 'italic',
   },
 });
