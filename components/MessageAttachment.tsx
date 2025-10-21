@@ -84,19 +84,38 @@ export default function MessageAttachment({ type, url, name, size, duration }: P
   }
 
   if (type === 'audio') {
+    const progress = audioDuration > 0 ? audioPosition / audioDuration : 0;
+
     return (
       <View style={styles.audioContainer}>
         <TouchableOpacity style={styles.audioPlayButton} onPress={playAudio}>
           {isPlaying ? (
-            <Pause size={24} color={theme.colors.surface} />
+            <Pause size={16} color={theme.colors.primary} fill={theme.colors.primary} />
           ) : (
-            <Play size={24} color={theme.colors.surface} />
+            <Play size={16} color={theme.colors.primary} fill={theme.colors.primary} />
           )}
         </TouchableOpacity>
-        <View style={styles.audioInfo}>
-          <Text style={styles.audioTitle}>Гласово съобщение</Text>
-          <Text style={styles.audioTime}>{formatTime(isPlaying ? audioPosition : audioDuration)}</Text>
+        <View style={styles.audioWaveformContainer}>
+          <View style={styles.waveformBackground}>
+            <View style={[styles.waveformProgress, { width: `${progress * 100}%` }]} />
+          </View>
+          {/* Waveform bars for visual effect */}
+          <View style={styles.waveformBars}>
+            {[3, 8, 5, 10, 7, 12, 6, 9, 4, 11, 7, 8, 5, 10, 6, 9, 7, 8].map((height, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.waveformBar,
+                  {
+                    height: height,
+                    backgroundColor: progress * 18 > index ? theme.colors.primary : theme.colors.border,
+                  },
+                ]}
+              />
+            ))}
+          </View>
         </View>
+        <Text style={styles.audioTime}>{formatTime(isPlaying ? audioPosition : audioDuration)}</Text>
       </View>
     );
   }
@@ -133,32 +152,54 @@ const styles = StyleSheet.create({
   audioContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.md,
-    backgroundColor: theme.colors.accentLight,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginTop: theme.spacing.xs,
+    gap: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    minWidth: 200,
   },
   audioPlayButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 2,
+    borderColor: theme.colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  audioInfo: {
+  audioWaveformContainer: {
     flex: 1,
+    height: 24,
+    justifyContent: 'center',
+    position: 'relative',
   },
-  audioTitle: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: '600',
-    color: theme.colors.text,
+  waveformBackground: {
+    position: 'absolute',
+    width: '100%',
+    height: 2,
+    backgroundColor: theme.colors.border,
+    borderRadius: 1,
+  },
+  waveformProgress: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 1,
+  },
+  waveformBars: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: '100%',
+    paddingHorizontal: 2,
+  },
+  waveformBar: {
+    width: 2,
+    borderRadius: 1,
   },
   audioTime: {
     fontSize: theme.fontSize.xs,
     color: theme.colors.textMuted,
-    marginTop: theme.spacing.xs,
+    minWidth: 35,
+    textAlign: 'right',
   },
   fileContainer: {
     flexDirection: 'row',

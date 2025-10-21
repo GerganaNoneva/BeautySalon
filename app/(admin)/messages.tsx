@@ -268,9 +268,19 @@ export default function MessagesScreen() {
 
       if (data && data.length > 0) {
         const sortedOldMessages = data.reverse();
+        const previousLength = messages.length;
         setMessages(prev => [...sortedOldMessages, ...prev]);
         setOldestMessageId(sortedOldMessages[0].id);
         setHasMore(data.length === 10);
+
+        // Scroll to the oldest newly loaded message
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: 0,
+            animated: true,
+            viewPosition: 1, // Position at the bottom of the viewport
+          });
+        }, 100);
       } else {
         setHasMore(false);
       }
@@ -820,6 +830,11 @@ export default function MessagesScreen() {
                 </Text>
               </View>
 
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+                style={{ flex: 1 }}
+              >
               <FlatList
                 ref={flatListRef}
                 data={messages}
@@ -829,10 +844,6 @@ export default function MessagesScreen() {
                 inverted={true}
                 onEndReached={loadOlderMessages}
                 onEndReachedThreshold={0.5}
-                maintainVisibleContentPosition={{
-                  minIndexForVisible: 0,
-                  autoscrollToTopThreshold: 10,
-                }}
                 ListFooterComponent={
                   loadingMore ? (
                     <View style={styles.loadingMoreContainer}>
@@ -847,11 +858,7 @@ export default function MessagesScreen() {
                 }
               />
 
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-                style={{ flex: 0 }}
-              >
+
                 {selectedAttachment && (
                   <View style={styles.attachmentPreview}>
                     <MessageAttachment

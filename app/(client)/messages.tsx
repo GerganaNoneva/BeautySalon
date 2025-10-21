@@ -226,9 +226,19 @@ export default function ClientMessagesScreen() {
 
       if (data && data.length > 0) {
         const sortedOldMessages = data.reverse();
+        const previousLength = messages.length;
         setMessages(prev => [...sortedOldMessages, ...prev]);
         setOldestMessageId(sortedOldMessages[0].id);
         setHasMore(data.length === 10);
+
+        // Scroll to the oldest newly loaded message
+        setTimeout(() => {
+          flatListRef.current?.scrollToIndex({
+            index: 0,
+            animated: true,
+            viewPosition: 1, // Position at the bottom of the viewport
+          });
+        }, 100);
       } else {
         setHasMore(false);
       }
@@ -414,10 +424,6 @@ export default function ClientMessagesScreen() {
               onEndReached={loadOlderMessages}
               onEndReachedThreshold={0.5}
               inverted={true}
-              maintainVisibleContentPosition={{
-                minIndexForVisible: 0,
-                autoscrollToTopThreshold: 10,
-              }}
               ListFooterComponent={
                 loadingMore ? (
                   <View style={styles.loadingMoreContainer}>
