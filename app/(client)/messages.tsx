@@ -228,21 +228,25 @@ export default function ClientMessagesScreen() {
 
       if (data && data.length > 0) {
         const sortedOldMessages = data.reverse();
-        const previousLength = messages.length;
         const oldContentHeight = contentHeightRef.current;
+        const oldScrollOffset = scrollOffsetRef.current;
 
         setMessages(prev => [...sortedOldMessages, ...prev]);
         setOldestMessageId(sortedOldMessages[0].id);
         setHasMore(data.length === 10);
 
-        // Maintain scroll position by scrolling to the first old message
-        setTimeout(() => {
-          flatListRef.current?.scrollToIndex({
-            index: sortedOldMessages.length,
+        // After new messages are added, maintain scroll position
+        // by calculating the height difference
+        requestAnimationFrame(() => {
+          const newContentHeight = contentHeightRef.current;
+          const heightDifference = newContentHeight - oldContentHeight;
+          const newScrollOffset = oldScrollOffset + heightDifference;
+
+          flatListRef.current?.scrollToOffset({
+            offset: newScrollOffset,
             animated: false,
-            viewPosition: 0,
           });
-        }, 100);
+        });
       } else {
         setHasMore(false);
       }
