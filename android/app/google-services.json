@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "632272205357",
+    "firebase_url": "https://books-ea170-default-rtdb.firebaseio.com",
+    "project_id": "books-ea170",
+    "storage_bucket": "books-ea170.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:632272205357:android:61bb993ed23df469e06aa4",
+        "android_client_info": {
+          "package_name": "com.urbanbeauty.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTe-e9htRsfq3293od8abmTm6T05SgSxM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
