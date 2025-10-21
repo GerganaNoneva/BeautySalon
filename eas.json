@@ -7,9 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "prebuildCommand": "./scripts/eas-build-pre-install.sh",
       "android": {
-        "buildType": "apk",
-        "prebuildCommand": "./scripts/eas-build-pre-install.sh"
+        "buildType": "apk"
       }
     },
     "preview": {

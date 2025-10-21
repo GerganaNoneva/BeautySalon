@@ -33,7 +33,9 @@
       "Bash(if exist node_modules.cache rmdir /s /q node_modules.cache)",
       "Bash(timeout:*)",
       "Bash(tasklist:*)",
-      "Bash(npx expo install:*)"
+      "Bash(npx expo install:*)",
+      "Bash(npx expo-doctor)",
+      "Bash(eas env:create:*)"
     ],
     "deny": [],
     "ask": []
