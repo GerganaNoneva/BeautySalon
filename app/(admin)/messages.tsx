@@ -74,6 +74,8 @@ export default function MessagesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [oldestMessageId, setOldestMessageId] = useState<string | null>(null);
+  const scrollOffsetRef = useRef(0);
+  const contentHeightRef = useRef(0);
 
   useEffect(() => {
     loadConversations();
@@ -235,7 +237,7 @@ export default function MessagesScreen() {
       }
 
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        flatListRef.current?.scrollToEnd({ animated: false });
       }, 100);
 
       await supabase
@@ -269,16 +271,18 @@ export default function MessagesScreen() {
       if (data && data.length > 0) {
         const sortedOldMessages = data.reverse();
         const previousLength = messages.length;
+        const oldContentHeight = contentHeightRef.current;
+
         setMessages(prev => [...sortedOldMessages, ...prev]);
         setOldestMessageId(sortedOldMessages[0].id);
         setHasMore(data.length === 10);
 
-        // Scroll to the oldest newly loaded message
+        // Maintain scroll position by scrolling to the first old message
         setTimeout(() => {
           flatListRef.current?.scrollToIndex({
-            index: 0,
-            animated: true,
-            viewPosition: 1, // Position at the bottom of the viewport
+            index: sortedOldMessages.length,
+            animated: false,
+            viewPosition: 0,
           });
         }, 100);
       } else {
@@ -396,7 +400,7 @@ export default function MessagesScreen() {
       console.log('✅ Message sent successfully');
 
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (err) {
       console.error('❌ Error sending message full object:', err);
@@ -841,10 +845,21 @@ export default function MessagesScreen() {
                 renderItem={renderMessage}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.messagesContent}
-                inverted={true}
-                onEndReached={loadOlderMessages}
-                onEndReachedThreshold={0.5}
-                ListFooterComponent={
+                onScroll={(event) => {
+                  const offsetY = event.nativeEvent.contentOffset.y;
+                  scrollOffsetRef.current = offsetY;
+
+                  // Load older messages when scrolling near the top
+                  if (offsetY < 100 && !loadingMore && hasMore) {
+                    loadOlderMessages();
+                  }
+                }}
+                onContentSizeChange={(width, height) => {
+                  contentHeightRef.current = height;
+                }}
+                scrollEventThrottle={400}
+                inverted={false}
+                ListHeaderComponent={
                   loadingMore ? (
                     <View style={styles.loadingMoreContainer}>
                       <ActivityIndicator size="small" color={theme.colors.primary} />
