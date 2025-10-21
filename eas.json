@@ -10,9 +10,6 @@
       "android": {
         "buildType": "apk",
         "prebuildCommand": "./scripts/eas-build-pre-install.sh"
-      },
-      "env": {
-        "GOOGLE_SERVICES_JSON": ""
       }
     },
     "preview": {
